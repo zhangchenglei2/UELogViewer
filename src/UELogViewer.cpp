@@ -108,6 +108,18 @@ static void applyStyles(HWND hSci) {
         sciSend(hSci, SCI_STYLESETBOLD,      s.id, s.bold ? 1 : 0);
         sciSend(hSci, SCI_STYLESETEOLFILLED,  s.id, s.eolFilled ? 1 : 0);
     }
+
+    // --- Selection color: dark blue bg + white text, readable on all log levels ---
+    // 1 = override enabled, 0 = use default
+    sciSend(hSci, SCI_SETSELFORE, 1, RGB_TO_SCINTILLA(255, 255, 255)); // white text
+    sciSend(hSci, SCI_SETSELBACK, 1, RGB_TO_SCINTILLA( 50,  90, 160)); // muted blue bg
+
+    // Caret: bright white so it's visible on dark bg
+    sciSend(hSci, SCI_SETCARETFORE, 0, RGB_TO_SCINTILLA(220, 220, 220));
+
+    // Current line highlight: slightly lighter than bg
+    sciSend(hSci, SCI_SETCARETLINEVISIBLE, 0, 1);
+    sciSend(hSci, SCI_SETCARETLINEBACK,    0, RGB_TO_SCINTILLA(45, 48, 55));
 }
 
 // ---------------------------------------------------------------------------

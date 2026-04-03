@@ -49,6 +49,19 @@ typedef ptrdiff_t sptr_t;
 
 #define SCI_SETIDLESTYLING      2521
 
+// Selection colors
+#define SCI_SETSELFORE          2067
+#define SCI_SETSELBACK          2068
+#define SCI_SETSELFOREGROUND    2067  // alias
+#define SCI_SETSELBACKGROUND    2068  // alias
+
+// Caret color
+#define SCI_SETCARETFORE        2069
+
+// Additional line highlight
+#define SCI_SETCARETLINEBACK    2094
+#define SCI_SETCARETLINEVISIBLE 2096
+
 #define SCLEX_CONTAINER         0
 #define SCLEX_NULL              1
 
