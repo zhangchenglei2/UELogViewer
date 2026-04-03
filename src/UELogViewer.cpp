@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <regex>
+#include <set>
 #include "ScintillaDefs.h"
 #include "PluginInterface.h"
 
@@ -28,6 +29,9 @@
 static const TCHAR PLUGIN_NAME[] = TEXT("UELogViewer");
 static NppData g_nppData;
 static HINSTANCE g_hModule = nullptr;
+
+// Track which BufferIDs have UE log highlighting enabled
+static std::set<LRESULT> g_enabledBuffers;
 
 // ---------------------------------------------------------------------------
 // Style IDs (Scintilla user-defined styles start at 0 for SCLEX_CONTAINER)
@@ -273,8 +277,13 @@ static void activateHighlighting() {
     HWND hSci = getCurrentScintilla();
     applyStyles(hSci);
     colouriseDocument(hSci);
+
+    // Remember this buffer so we can restore highlighting on tab switch
+    LRESULT bufId = ::SendMessage(g_nppData._nppHandle, NPPM_GETCURRENTBUFFERID, 0, 0);
+    g_enabledBuffers.insert(bufId);
+
     ::MessageBox(g_nppData._nppHandle,
-        TEXT("UE Log highlighting applied!\n\nColors:\n  Fatal   - white on red\n  Error   - red\n  Warning - yellow\n  Display - cyan\n  Log     - light gray\n  Verbose - gray\n  VeryVerbose - dark gray"),
+        TEXT("UE Log highlighting applied!\n\nColors:\n  Fatal   - white on red\n  Error   - red\n  Warning - yellow\n  Display - cyan\n  Log     - light gray\n  Verbose - gray\n  VeryVerbose - dark gray\n\nHighlighting will persist when switching tabs."),
         TEXT("UELogViewer"), MB_OK | MB_ICONINFORMATION);
 }
 
@@ -282,6 +291,10 @@ static void resetHighlighting() {
     HWND hSci = getCurrentScintilla();
     sciSend(hSci, SCI_SETLEXER, SCLEX_NULL, 0);
     sciSend(hSci, SCI_STYLECLEARALL, 0, 0);
+
+    // Remove this buffer from tracking
+    LRESULT bufId = ::SendMessage(g_nppData._nppHandle, NPPM_GETCURRENTBUFFERID, 0, 0);
+    g_enabledBuffers.erase(bufId);
 }
 
 static void showAbout() {
@@ -320,9 +333,28 @@ __declspec(dllexport) FuncItem * getFuncsArray(int *nbF) {
 }
 
 __declspec(dllexport) void beNotified(SCNotification *notification) {
-    // Auto re-highlight on SCN_UPDATEUI (content changed)
-    // Only if lexer is already set to CONTAINER (we activated it)
-    if (notification->nmhdr.code == SCN_UPDATEUI) {
+    switch (notification->nmhdr.code) {
+
+    // --- Tab switched: restore highlighting if this buffer had it enabled ---
+    case NPPN_BUFFERACTIVATED: {
+        LRESULT bufId = (LRESULT)notification->nmhdr.idFrom;
+        if (g_enabledBuffers.count(bufId)) {
+            HWND hSci = getCurrentScintilla();
+            applyStyles(hSci);
+            colouriseDocument(hSci);
+        }
+        break;
+    }
+
+    // --- File closed: clean up tracking ---
+    case NPPN_FILEBEFORECLOSE: {
+        LRESULT bufId = (LRESULT)notification->nmhdr.idFrom;
+        g_enabledBuffers.erase(bufId);
+        break;
+    }
+
+    // --- Content changed: re-colourise if highlighting is active ---
+    case SCN_UPDATEUI: {
         HWND hSci = (notification->nmhdr.hwndFrom == g_nppData._scintillaMainHandle)
                     ? g_nppData._scintillaMainHandle
                     : g_nppData._scintillaSecondHandle;
@@ -330,6 +362,11 @@ __declspec(dllexport) void beNotified(SCNotification *notification) {
         if (lexer == SCLEX_CONTAINER) {
             colouriseDocument(hSci);
         }
+        break;
+    }
+
+    default:
+        break;
     }
 }
 
